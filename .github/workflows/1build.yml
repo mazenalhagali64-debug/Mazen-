@@ -1,0 +1,58 @@
+name: Fast APK Builder
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Extract and Build Capacitor/HTML Project
+        run: |
+          # فك ضغط ملف studio-pro-capacitor1.zip حصراً
+          if [ -f "studio-pro-capacitor1.zip" ]; then
+            unzip -o "studio-pro-capacitor1.zip" -d app_folder
+          else
+            echo "الملف غير موجود!"
+            exit 1
+          fi
+
+          cd app_folder
+          # الدخول لأول مجلد ناتج
+          cd $(ls -d */ | head -n 1)
+
+          if [ -f "package.json" ]; then
+            npm install
+            npx cap update android || true
+            npx cap sync android || true
+          fi
+
+          if [ -d "android" ]; then
+            cd android
+            chmod +x gradlew
+            ./gradlew assembleDebug
+          fi
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: app-debug
+          path: |
+            app_folder/**/android/app/build/outputs/apk/debug/*.apk
+            app_folder/**/*.apk
