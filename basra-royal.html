@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>بصرة الملكية أونلاين | Basra Royal Pro</title>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.2/dist/peerjs.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+:root{--felt:#0a3820;--edge:#051e11;--gold:#d4af37;--gl:#f7e07d;--glow:rgba(212,175,55,.45);--cw:66px;--ch:96px}
+*{box-sizing:border-box;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;margin:0;padding:0;font-family:'Tajawal',Tahoma,sans-serif}
+body{background:#030a06;color:#f1f5f2;display:flex;justify-content:center;align-items:center;min-height:100vh;overflow:hidden}
+#game-wrapper{width:100vw;max-width:480px;height:100vh;max-height:920px;background:radial-gradient(circle at center,#134e2c 0%,var(--felt) 65%,var(--edge) 100%);position:relative;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 0 50px #000;border:3px solid #1a4229;overflow:hidden}
+.hud{padding:10px 14px;display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,.55);backdrop-filter:blur(10px);border-bottom:1px solid rgba(212,175,55,.25);z-index:20}
+.hud-player{display:flex;flex-direction:column;gap:2px;font-size:.8rem}
+.hud-player.me{text-align:left}
+.score-val{font-weight:900;color:var(--gold);font-size:1.15rem}
+.cards-val{color:#8bc34a;font-size:.75rem}
+#turn-box{font-size:.85rem;background:rgba(10,30,18,.85);border:1.5px solid var(--gold);padding:6px 14px;border-radius:20px;color:var(--gl);font-weight:700;text-align:center;box-shadow:0 0 12px var(--glow)}
+.hand-area{height:115px;display:flex;justify-content:center;align-items:center;gap:8px;padding:8px;z-index:10}
+.board-container{flex-grow:1;display:flex;flex-direction:column;justify-content:center;align-items:center;position:relative;padding:10px}
+.board-area{width:100%;display:flex;flex-wrap:wrap;align-content:center;justify-content:center;gap:8px;min-height:200px}
+.deck-badge{position:absolute;left:14px;display:flex;flex-direction:column;align-items:center;font-size:.72rem;color:rgba(255,255,255,.7)}
+.card{width:var(--cw);height:var(--ch);background:#fff;border-radius:9px;box-shadow:0 4px 10px rgba(0,0,0,.45),inset 0 0 0 1px #e2e2e2;display:flex;flex-direction:column;justify-content:space-between;padding:4px 5px;font-weight:900;position:relative;transition:transform .2s,box-shadow .2s;flex-shrink:0}
+.card.playable{cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,.6),0 0 14px var(--glow);transform:translateY(-6px)}
+.card.playable:active{transform:scale(.94)}
+.card.red{color:#d32f2f}.card.black{color:#1e1e1e}
+.card-corner{line-height:1;font-size:.88rem;display:flex;flex-direction:column;align-items:center}
+.card-corner span{font-size:.7rem;margin-top:1px}
+.card-center-suit{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:1.75rem}
+.card.back{background:repeating-linear-gradient(135deg,#7c1212,#7c1212 9px,#991818 9px,#991818 18px);border:2px solid #fff}
+.modal{position:absolute;inset:0;background:rgba(3,10,6,.96);display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:100;padding:24px;text-align:center}
+.modal.hidden{display:none!important}
+.modal h1{color:var(--gold);font-size:2.1rem;margin-bottom:20px;text-shadow:0 2px 10px var(--glow)}
+.modal h2{margin-bottom:14px;font-size:1.3rem}
+.modal p{line-height:1.9;font-size:.95rem;margin-bottom:14px}
+.btn{background:linear-gradient(180deg,#f7ce46,#c2910c);color:#0b170f;border:none;padding:13px 28px;font-size:1.05rem;font-weight:800;border-radius:30px;cursor:pointer;margin:7px 0;width:85%;max-width:290px;box-shadow:0 4px 15px rgba(0,0,0,.4)}
+.btn:active{transform:scale(.97)}
+.btn-outline{background:transparent;border:2px solid var(--gold);color:var(--gold)}
+.btn-rules{background:none;border:none;color:#aaa;font-size:.85rem;margin-top:10px;cursor:pointer;text-decoration:underline}
+input{padding:13px;border-radius:25px;border:2px solid var(--gold);background:#091c11;color:#fff;text-align:center;font-size:1.15rem;font-weight:700;width:85%;max-width:290px;margin-bottom:12px;outline:none}
+.toast{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(0);background:rgba(0,0,0,.92);color:var(--gold);padding:18px 40px;border-radius:40px;font-size:1.6rem;font-weight:900;border:2.5px solid var(--gold);z-index:60;pointer-events:none;transition:transform .3s cubic-bezier(.175,.885,.32,1.3);text-align:center;box-shadow:0 0 35px var(--glow);white-space:nowrap}
+.toast.show{transform:translate(-50%,-50%) scale(1)}
+</style>
+</head>
+<body>
+<div id="game-wrapper">
+  <div class="hud">
+    <div class="hud-player"><span>الخصم</span><span>النقاط: <span id="opp-score" class="score-val">0</span></span><span class="cards-val">الورق: <span id="opp-cards">0</span></span></div>
+    <div id="turn-box">بانتظار البدء</div>
+    <div class="hud-player me"><span>أنت</span><span>النقاط: <span id="my-score" class="score-val">0</span></span><span class="cards-val">الورق: <span id="my-cards">0</span></span></div>
+  </div>
+  <div class="hand-area" id="opp-hand"></div>
+  <div class="board-container">
+    <div class="deck-badge"><div class="card back" style="width:40px;height:56px;margin-bottom:4px"></div><span>متبقي: <b id="deck-count">52</b></span></div>
+    <div class="board-area" id="board-cards"></div>
+  </div>
+  <div class="hand-area" id="player-hand"></div>
+  <div id="toast" class="toast"></div>
+
+  <div id="modal-lobby" class="modal">
+    <h1>👑 بصرة الملكية</h1>
+    <button class="btn" onclick="startOfflineMode()">لعب أوفلاين (ضد الذكاء)</button>
+    <button class="btn btn-outline" onclick="openHostView()">إنشاء غرفة أونلاين</button>
+    <button class="btn btn-outline" onclick="openJoinView()">انضمام برمز الغرفة</button>
+    <button class="btn-rules" onclick="showRules()">قواعد البصرة</button>
+  </div>
+  <div id="modal-host" class="modal hidden">
+    <h2>رمز غرفتك</h2>
+    <input type="text" id="host-room-code" readonly>
+    <p style="color:#aaa">شارك هذا الرمز مع صديقك. اللعبة بتبدأ أول ما يدخل.</p>
+    <button class="btn btn-outline" onclick="exitToLobby()">إلغاء</button>
+  </div>
+  <div id="modal-join" class="modal hidden">
+    <h2>أدخل رمز الغرفة</h2>
+    <input type="text" id="join-room-input" placeholder="اكتب الرمز هنا" inputmode="numeric">
+    <button class="btn" onclick="connectToHost()">دخول المباراة</button>
+    <button class="btn btn-outline" onclick="exitToLobby()">رجوع</button>
+  </div>
+  <div id="modal-msg" class="modal hidden">
+    <h2 id="msg-title"></h2>
+    <p id="msg-body"></p>
+    <button class="btn" onclick="$('modal-msg').classList.add('hidden')">تمام</button>
+  </div>
+  <div id="modal-end" class="modal hidden">
+    <h1 id="end-title"></h1>
+    <p id="end-score" style="font-size:1.2rem"></p>
+    <button class="btn" id="btn-again" onclick="replay()">العب مرة تانية</button>
+    <button class="btn btn-outline" onclick="exitToLobby()">القائمة</button>
+  </div>
+</div>
+
+<script>
+const $=i=>document.getElementById(i);
+const SUITS=['♠','♥','♦','♣'],RANKS=['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+const pts=r=>r==='A'?1:r==='J'?11:r==='Q'?12:r==='K'?13:+r;
+
+const AudioSys={ctx:null,play(a){try{
+  const C=window.AudioContext||window.webkitAudioContext;if(!this.ctx)this.ctx=new C();
+  if(this.ctx.state==='suspended')this.ctx.resume();
+  const t=this.ctx.currentTime,o=this.ctx.createOscillator(),g=this.ctx.createGain();
+  o.connect(g);g.connect(this.ctx.destination);
+  const P={deal:['sine',[320,140],.07],capture:['triangle',[350,700],.12],basra:['square',[523,784],.35]}[a];
+  o.type=P[0];o.frequency.setValueAtTime(P[1][0],t);o.frequency.exponentialRampToValueAtTime(P[1][1],t+P[2]);
+  g.gain.setValueAtTime(.28,t);g.gain.linearRampToValueAtTime(0,t+P[2]);o.start(t);o.stop(t+P[2]);
+}catch(e){}}};
+
+let State={deck:[],board:[],p1Hand:[],p2Hand:[],p1Pile:[],p2Pile:[],p1Score:0,p2Score:0,turn:'p1',lastCollector:null,over:false,mode:'offline',role:'host'};
+let peer=null,activeConnection=null,EV='';
+
+function generateDeck(){
+  let d=[],n=0;
+  for(const s of SUITS)for(const r of RANKS)d.push({id:++n,suit:s,rank:r,val:pts(r)});
+  for(let i=d.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[d[i],d[j]]=[d[j],d[i]]}
+  return d;
+}
+
+const isSpecial=c=>c.rank==='J'||(c.rank==='7'&&c.suit==='♦');
+
+function evaluateBasraCapture(card,floor){
+  if(card.rank==='J')return{captured:[...floor],isBasra:floor.length===1&&floor[0].rank==='J'};
+  if(card.rank==='7'&&card.suit==='♦')return{captured:[...floor],isBasra:floor.length===1};
+  let taken=[],ids=new Set();
+  floor.forEach(fc=>{if(fc.val===card.val){taken.push(fc);ids.add(fc.id)}});
+  if(card.val<=10){
+    const pool=floor.filter(fc=>!ids.has(fc.id)&&fc.val<card.val),combos=[];
+    (function bt(st,cur,sum){
+      if(sum===card.val){combos.push([...cur]);return}
+      if(sum>card.val)return;
+      for(let i=st;i<pool.length;i++){cur.push(pool[i]);bt(i+1,cur,sum+pool[i].val);cur.pop()}
+    })(0,[],0);
+    for(const cb of combos){
+      if(!cb.some(c=>ids.has(c.id)))cb.forEach(c=>{taken.push(c);ids.add(c.id)});
+    }
+  }
+  return{captured:taken,isBasra:taken.length>0&&taken.length===floor.length};
+}
+
+function startNewGame(mode,role='host'){
+  State.mode=mode;State.role=role;State.over=false;EV='';
+  document.querySelectorAll('.modal').forEach(m=>m.classList.add('hidden'));
+  if(role==='host'){
+    Object.assign(State,{deck:generateDeck(),board:[],p1Hand:[],p2Hand:[],p1Pile:[],p2Pile:[],p1Score:0,p2Score:0,turn:'p1',lastCollector:null});
+    while(State.board.length<4){
+      const d=State.deck.pop();
+      if(!isSpecial(d))State.board.push(d);else State.deck.unshift(d);
+    }
+    dealRound();
+  }else{
+    Object.assign(State,{deck:[],board:[],p1Hand:[],p2Hand:[],p1Pile:[],p2Pile:[],p1Score:0,p2Score:0,turn:'p1'});
+  }
+  renderTable();
+  broadcastNetworkState();
+}
+
+function dealRound(){
+  if(!State.deck.length){finishMatch();return}
+  for(let i=0;i<4;i++){
+    if(State.deck.length)State.p1Hand.push(State.deck.pop());
+    if(State.deck.length)State.p2Hand.push(State.deck.pop());
+  }
+  AudioSys.play('deal');
+}
+
+function finishMatch(){
+  if(State.board.length&&State.lastCollector){
+    State[State.lastCollector+'Pile'].push(...State.board);
+    State.board=[];
+  }
+  const a=State.p1Pile.length,b=State.p2Pile.length;
+  if(a>b)State.p1Score+=30;else if(b>a)State.p2Score+=30;
+  State.over=true;
+}
+
+function applyTurnMove(player,i){
+  if(State.over||State.turn!==player)return;
+  const hand=State[player+'Hand'];
+  if(!hand[i])return;
+  const card=hand.splice(i,1)[0],out=evaluateBasraCapture(card,State.board);
+  EV='deal';
+  if(out.captured.length){
+    State[player+'Pile'].push(card,...out.captured);
+    const ids=new Set(out.captured.map(c=>c.id));
+    State.board=State.board.filter(c=>!ids.has(c.id));
+    State.lastCollector=player;
+    if(out.isBasra){State[player+'Score']+=10;EV='basra';triggerToast('🔥 بصرة! (+10)');AudioSys.play('basra')}
+    else{EV='capture';AudioSys.play('capture')}
+  }else{
+    State.board.push(card);
+    AudioSys.play('deal');
+  }
+  State.turn=player==='p1'?'p2':'p1';
+  if(!State.p1Hand.length&&!State.p2Hand.length)dealRound();
+  renderTable();
+  broadcastNetworkState();
+  if(State.mode==='offline'&&State.turn==='p2'&&!State.over)setTimeout(runAITurn,750);
+}
+
+function runAITurn(){
+  if(State.over||!State.p2Hand.length)return;
+  let best=0,bs=-1e9;
+  State.p2Hand.forEach((c,i)=>{
+    const o=evaluateBasraCapture(c,State.board),sp=isSpecial(c);
+    const s=o.captured.length?o.captured.length*2+(o.isBasra?20:0)-(sp&&o.captured.length<2?6:0):-c.val*.1-(sp?8:0);
+    if(s>bs){bs=s;best=i}
+  });
+  applyTurnMove('p2',best);
+}
+
+function cardEl(c,play,i){
+  const d=document.createElement('div');
+  if(!c){d.className='card back';return d}
+  const red=c.suit==='♥'||c.suit==='♦';
+  d.className='card '+(red?'red':'black')+(play?' playable':'');
+  const k=`<div class="card-corner">${c.rank}<span>${c.suit}</span></div>`;
+  d.innerHTML=k+`<div class="card-center-suit">${c.suit}</div>`+k.replace('class="card-corner"','class="card-corner" style="transform:rotate(180deg)"');
+  if(play)d.onclick=()=>playCard(i);
+  return d;
+}
+const fill=(id,els)=>{const e=$(id);e.innerHTML='';els.forEach(x=>e.appendChild(x))};
+
+function renderTable(){
+  const g=State.role==='guest',me=g?'p2':'p1',op=g?'p1':'p2';
+  const mine=State.turn===me&&!State.over;
+  fill('player-hand',State[me+'Hand'].map((c,i)=>cardEl(c,mine,i)));
+  fill('opp-hand',State[op+'Hand'].map(()=>cardEl(null)));
+  fill('board-cards',State.board.map(c=>cardEl(c)));
+  $('my-score').textContent=State[me+'Score'];
+  $('opp-score').textContent=State[op+'Score'];
+  $('my-cards').textContent=State[me+'Pile'].length;
+  $('opp-cards').textContent=State[op+'Pile'].length;
+  $('deck-count').textContent=State.deck.length;
+  $('turn-box').textContent=State.over?'انتهت اللعبة':mine?'دورك 🎯':'دور الخصم...';
+  if(State.over)showEnd();
+}
+
+function playCard(i){
+  if(State.over)return;
+  if(State.mode==='offline'||State.role==='host')applyTurnMove('p1',i);
+  else if(State.turn==='p2'&&activeConnection&&activeConnection.open)activeConnection.send({t:'move',idx:i});
+}
+
+function showEnd(){
+  const g=State.role==='guest',a=State.p1Score,b=State.p2Score,my=g?b:a,op=g?a:b;
+  $('end-title').textContent=my>op?'🏆 فزت!':my<op?'خسرت هالمرة':'تعادل';
+  $('end-score').textContent=`نقاطك ${my} — الخصم ${op}`;
+  $('btn-again').style.display=g?'none':'';
+  $('modal-end').classList.remove('hidden');
+}
+function replay(){startNewGame(State.mode,'host')}
+
+let tt;
+function triggerToast(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),1400)}
+function showMsg(t,h){$('msg-title').textContent=t;$('msg-body').innerHTML=h;$('modal-msg').classList.remove('hidden')}
+function showRules(){showMsg('قواعد البصرة','• الولد (J) بيلمّ كل الورق من الأرض.<br>• سبعة الديناري (7♦) بتلمّ كل الورق.<br>• الورقة بتلمّ الورق اللي بنفس قيمتها، أو الورق اللي مجموعه قيمتها (لحد 10).<br>• بصرة: تلمّ كل ورق الأرض بورقة وحدة = +10 نقاط.<br>• بالنهاية، صاحب أكتر ورق بياخد +30.')}
+
+/* Online play: host runs the game, guest sends moves */
+function broadcastNetworkState(){
+  if(State.mode!=='multi'||State.role!=='host'||!activeConnection||!activeConnection.open)return;
+  activeConnection.send({t:'state',board:State.board,p1n:State.p1Hand.length,p2Hand:State.p2Hand,dn:State.deck.length,p1c:State.p1Pile.length,p2c:State.p2Pile.length,p1s:State.p1Score,p2s:State.p2Score,turn:State.turn,over:State.over,ev:EV});
+  EV='';
+}
+function onState(m){
+  if(m.t!=='state')return;
+  Object.assign(State,{board:m.board,p1Hand:Array(m.p1n).fill(null),p2Hand:m.p2Hand,deck:Array(m.dn).fill(null),p1Pile:Array(m.p1c).fill(null),p2Pile:Array(m.p2c).fill(null),p1Score:m.p1s,p2Score:m.p2s,turn:m.turn,over:m.over});
+  if(m.ev==='basra'){triggerToast('🔥 بصرة! (+10)');AudioSys.play('basra')}
+  else if(m.ev)AudioSys.play(m.ev);
+  renderTable();
+}
+const show=id=>{document.querySelectorAll('.modal').forEach(m=>m.classList.add('hidden'));$(id).classList.remove('hidden')};
+function startOfflineMode(){startNewGame('offline','host')}
+function openHostView(){
+  show('modal-host');
+  const code=String(Math.floor(10000+Math.random()*90000));
+  $('host-room-code').value=code;
+  try{peer=new Peer('basra-royal-'+code)}catch(e){show('modal-lobby');showMsg('خطأ','تعذر الاتصال بالسيرفر.');return}
+  peer.on('connection',c=>{
+    activeConnection=c;
+    c.on('open',()=>startNewGame('multi','host'));
+    c.on('data',d=>{if(d&&d.t==='move'&&State.mode==='multi')applyTurnMove('p2',d.idx)});
+    c.on('close',()=>showMsg('انقطع الاتصال','الخصم طلع من اللعبة.'));
+  });
+  peer.on('error',e=>showMsg('خطأ بالاتصال',e.type));
+}
+function openJoinView(){show('modal-join')}
+function connectToHost(){
+  const code=$('join-room-input').value.trim();
+  if(!code)return;
+  peer=new Peer();
+  peer.on('open',()=>{
+    const c=peer.connect('basra-royal-'+code,{reliable:true});
+    activeConnection=c;
+    c.on('open',()=>startNewGame('multi','guest'));
+    c.on('data',onState);
+    c.on('close',()=>showMsg('انقطع الاتصال','المضيف طلع من اللعبة.'));
+  });
+  peer.on('error',e=>showMsg('خطأ بالاتصال',e.type==='peer-unavailable'?'ما لقيت غرفة بهالرمز.':e.type));
+}
+function exitToLobby(){
+  if(peer){try{peer.destroy()}catch(e){}peer=null}
+  activeConnection=null;State.mode='offline';State.role='host';
+  show('modal-lobby');
+}
+</script>
+</body>
+</html>
