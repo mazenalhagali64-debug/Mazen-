@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>مجلس النماذج</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--ink:#1b2733;--mut:#66727e;--line:#d9e0e6;--acc:#0f7f86;--acc2:#e0a526;--err:#b3412f}
+@media(prefers-color-scheme:dark){:root{--bg:#101820;--card:#18232d;--ink:#e8eef2;--mut:#93a1ad;--line:#2b3a47;--acc:#3cc0c7;--acc2:#e8b84a;--err:#ef7b68}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.7 Tajawal,Tahoma,sans-serif;padding:14px;max-width:760px;margin-inline:auto}
+h1{font-size:26px;font-weight:800;margin:6px 0 2px}
+.sub{color:var(--mut);margin:0 0 14px;font-size:14px}
+.box{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}
+summary{cursor:pointer;font-weight:700}
+label{display:block;font-size:13px;color:var(--mut);margin-top:8px}
+input,select,textarea{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+textarea{min-height:130px;resize:vertical}
+.slot{display:grid;grid-template-columns:auto 98px 1fr;gap:6px;align-items:center;margin-top:6px}
+.slot input[type=checkbox]{width:20px;height:20px}
+.slot input,.slot select{padding:6px;font-size:14px;direction:ltr}
+.row{display:flex;gap:8px;align-items:center;margin-top:10px}
+.row select{width:auto}
+button{font:inherit;font-weight:700;border:0;border-radius:8px;padding:10px 16px;cursor:pointer;background:var(--acc);color:#fff}
+button.g{background:transparent;color:var(--acc);border:1px solid var(--acc)}
+button:disabled{opacity:.5;cursor:wait}
+#go{flex:1;font-size:17px}
+#st{color:var(--acc2);font-weight:700;min-height:26px;margin:4px 0}
+#err{color:var(--err);font-size:13px;white-space:pre-wrap}
+#out{white-space:pre-wrap;word-break:break-word;line-height:1.8}
+.hint{font-size:12px;color:var(--mut)}
+</style>
+</head>
+<body>
+<h1>مجلس النماذج</h1>
+<p class="sub">اكتب مهمتك مرة وحدة. النماذج بتقترح وبتنتقد بعض وبتتفق، وبيطلعلك جواب واحد نهائي.</p>
+
+<details class="box" id="set" open>
+<summary>الإعدادات (المفاتيح والنماذج)</summary>
+<label>مفتاح Gemini (من AI Studio)</label><input id="k-gemini" type="password" dir="ltr">
+<label>مفتاح Groq</label><input id="k-groq" type="password" dir="ltr">
+<label>مفتاح OpenRouter (للنماذج المجانية)</label><input id="k-openrouter" type="password" dir="ltr">
+<p class="hint">المفاتيح بتتخزن بجهازك فقط. أي نموذج مفتاح مزوّده فاضي بيتم تجاهله.</p>
+<div id="slots"></div>
+<p class="hint">أسماء النماذج المجانية بـ OpenRouter بتتغير مع الوقت. إذا نموذج فشل انسخ اسمه الجديد من موقعهم. النموذج اللي بيفشل بيتخطّاه التطبيق وبيكمل.</p>
+</details>
+
+<div class="box">
+<textarea id="task" placeholder="مثال: ابني لي تطبيق ويب لإدارة مخزون محل أدوات صحية..."></textarea>
+<div class="row">
+<select id="rounds" aria-label="عدد جولات النقاش"><option value="1">جولة نقاش</option><option value="2">جولتين</option><option value="3">3 جولات</option></select>
+<button id="go">ابدأ</button>
+</div>
+</div>
+
+<div id="st"></div>
+<div id="err"></div>
+
+<div class="box" id="res" hidden>
+<div id="out"></div>
+<div class="row"><button class="g" id="cp">نسخ</button><button class="g" id="dl" hidden>تنزيل كملف HTML</button></div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id),sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const URLS={groq:'https://api.groq.com/openai/v1/chat/completions',openrouter:'https://openrouter.ai/api/v1/chat/completions'};
+const DEF=[
+['gemini','gemini-3-flash-preview'],['gemini','gemini-2.5-flash'],
+['groq','llama-3.3-70b-versatile'],['groq','openai/gpt-oss-120b'],['groq','qwen/qwen3-32b'],
+['openrouter','deepseek/deepseek-r1:free'],['openrouter','meta-llama/llama-3.3-70b-instruct:free'],
+['openrouter','qwen/qwen3-coder:free'],['openrouter','google/gemma-3-27b-it:free'],['openrouter','mistralai/mistral-small-3.2-24b-instruct:free']
+].map(([p,m])=>({on:true,p,m}));
+let S={keys:{},slots:DEF,rounds:1};
+try{const x=JSON.parse(localStorage.getItem('mc'));if(x&&x.slots)S=x}catch(e){}
+const save=()=>{try{localStorage.setItem('mc',JSON.stringify(S))}catch(e){}};
+
+function render(){
+ for(const p of['gemini','groq','openrouter']){const i=$('k-'+p);i.value=S.keys[p]||'';i.oninput=()=>{S.keys[p]=i.value.trim();save()}}
+ $('rounds').value=S.rounds;$('rounds').onchange=e=>{S.rounds=+e.target.value;save()};
+ $('slots').innerHTML='';
+ S.slots.forEach((s,n)=>{
+  const d=document.createElement('div');d.className='slot';
+  d.innerHTML=`<input type="checkbox" ${s.on?'checked':''} aria-label="تفعيل النموذج ${n+1}"><select><option value="gemini">Gemini</option><option value="groq">Groq</option><option value="openrouter">OpenRouter</option></select><input value="${s.m}">`;
+  const[c,sel,inp]=d.children;sel.value=s.p;
+  c.onchange=()=>{s.on=c.checked;save()};sel.onchange=()=>{s.p=sel.value;save()};inp.oninput=()=>{s.m=inp.value.trim();save()};
+  $('slots').appendChild(d);
+ });
+}
+render();
+
+async function call(s,prompt,tries=3){
+ const key=S.keys[s.p];let last;
+ for(let i=0;i<tries;i++){
+  try{
+   let r;
+   if(s.p==='gemini')r=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${s.m}:generateContent?key=${key}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})});
+   else r=await fetch(URLS[s.p],{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+key},body:JSON.stringify({model:s.m,messages:[{role:'user',content:prompt}]})});
+   if(r.status===429||r.status>=500){last=new Error('ضغط على الخدمة ('+r.status+')');await sleep(5000*(i+1));continue}
+   const j=await r.json();
+   if(!r.ok)throw new Error(j.error?.message||r.status);
+   let t=s.p==='gemini'?(j.candidates?.[0]?.content?.parts||[]).map(x=>x.text||'').join(''):j.choices?.[0]?.message?.content;
+   t=(t||'').replace(/<think>[\s\S]*?<\/think>/g,'').trim();
+   if(t)return t;
+   last=new Error('رد فاضي');
+  }catch(e){last=e;if(i<tries-1)await sleep(2000)}
+ }
+ throw last;
+}
+
+const errs=[];
+const st=t=>$('st').textContent=t;
+async function stage(list,label,mk){
+ let done=0;st(`${label}: 0/${list.length}`);
+ const res=await Promise.all(list.map(async o=>{
+  try{const t=await call(o.s,mk(o));return{...o,t}}
+  catch(e){errs.push(`${o.s.m}: ${e.message}`);return null}
+  finally{done++;st(`${label}: ${done}/${list.length}`)}
+ }));
+ return res.filter(Boolean);
+}
+const pack=(arr,skip)=>arr.filter(x=>x!==skip).map((x,i)=>`--- اقتراح ${i+1} ---\n${x.t}`).join('\n\n');
+
+$('go').onclick=async()=>{
+ const task=$('task').value.trim();
+ const act=S.slots.filter(s=>s.on&&s.m&&S.keys[s.p]);
+ errs.length=0;$('err').textContent='';$('res').hidden=true;
+ if(!task){st('اكتب المهمة أولاً.');return}
+ if(act.length<2){st('فعّل نموذجين على الأقل وحط مفاتيحهم.');return}
+ $('go').disabled=true;
+ try{
+  let cur=await stage(act.map(s=>({s})),'النماذج تكتب اقتراحاتها',()=>`المهمة:\n${task}\n\nقدّم أفضل حل كامل ومفصّل وقابل للتنفيذ. اكتب بالعربية، وأي كود يكون كاملاً.`);
+  if(cur.length<1)throw new Error('ما رد أي نموذج. تأكد من المفاتيح.');
+  for(let r=1;r<=S.rounds&&cur.length>1;r++){
+   const prev=cur;
+   const next=await stage(prev,`جولة نقاش ${r}: النماذج تراجع بعض`,o=>`المهمة:\n${task}\n\nهذا اقتراحك:\n${o.t}\n\nواقتراحات زملائك:\n${pack(prev,o)}\n\nانتقد الاقتراحات بسرعة، خذ أفضل ما فيها، وصحّح أخطاءك. اكتب النسخة المحسّنة الكاملة فقط بدون شرح للنقد.`);
+   if(next.length)cur=next;
+  }
+  const judge=cur[0];
+  st('النماذج بتتفق على الجواب النهائي...');
+  let fin;
+  for(const o of cur){try{fin=await call(o.s,`المهمة:\n${task}\n\nهي الاقتراحات النهائية من عدة نماذج بعد نقاش:\n${pack(cur)}\n\nاكتب الجواب النهائي الموحّد الواحد، بأفضل ما في كل الاقتراحات وبدون تعارض. بدون مقدمات أو ذكر النماذج. أي كود يكون كاملاً وجاهزاً.`);break}catch(e){errs.push(`${o.s.m}: ${e.message}`)}}
+  if(!fin)throw new Error('فشل دمج الجواب النهائي.');
+  $('out').textContent=fin;$('res').hidden=false;
+  const m=fin.match(/```html\n([\s\S]*?)```/);$('dl').hidden=!m;$('dl').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([m[1]],{type:'text/html'}));a.download='result.html';a.click()};
+  st(`خلص. شارك ${cur.length} نماذج.`);
+ }catch(e){st('');errs.push(e.message)}
+ $('go').disabled=false;
+ if(errs.length)$('err').textContent='ملاحظات:\n'+errs.join('\n');
+};
+$('cp').onclick=async()=>{try{await navigator.clipboard.writeText($('out').textContent);$('cp').textContent='تم النسخ'}catch(e){}setTimeout(()=>$('cp').textContent='نسخ',1500)};
+</script>
+</body>
+</html>
