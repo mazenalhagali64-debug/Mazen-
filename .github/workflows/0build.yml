@@ -1,0 +1,44 @@
+name: Build APK
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions: write-all
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unzip project
+        run: unzip -o PhoneAgent.zip
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.7
+
+      - name: Build debug APK
+        working-directory: PhoneAgent
+        run: gradle assembleDebug --stacktrace
+
+      - name: Rename APK
+        run: cp PhoneAgent/app/build/outputs/apk/debug/app-debug.apk PhoneAgent.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PhoneAgent-apk
+          path: PhoneAgent.apk
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: PhoneAgent build ${{ github.run_number }}
+          files: PhoneAgent.apk
